@@ -47,6 +47,41 @@ func runCommand(_ command: String, arguments: [String] = [], in directory: Strin
     }
 }
 
+func isXcodeRunning() -> Bool {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["pgrep", "Xcode"]
+
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+     do {
+        try process.run()
+        process.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return !data.isEmpty
+    } catch {
+        print("Error checking Xcode process: \(error)")
+        return false
+    }
+}
+
+func killXCode() {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["killall", "Xcode"]
+
+    do {
+        try process.run()
+        process.waitUntilExit()
+        print("Xcode has been closed.")
+    } catch {
+        print("Error killing Xcode process: \(error)")
+    }
+}
+
 func integratePods(in projectDirectory: String) {
     // Step 1: bundle exec pod deintegrate
     let deintegrate = """
@@ -67,7 +102,19 @@ func integratePods(in projectDirectory: String) {
     ==================================================
     """
     
-    
+    let xcodeisRunning = """
+    ==================================================
+    ====== Xcode is running, closing it ==============
+    ==================================================
+    """
+    // checking if xCode is running and close it
+    print(Colors.magenta + xcodeisRunning + Colors.reset)
+    if isXcodeRunning() {
+        killXCode()
+
+        sleep(2)
+    }
+
     print(Colors.cyan + deintegrate + Colors.reset)
   if runCommand("bundle", arguments: ["exec", "pod", "deintegrate"], in: projectDirectory) {
     sleep(2)
@@ -80,15 +127,15 @@ func integratePods(in projectDirectory: String) {
         // Step 3: Resolve package versions in Xcode
         print(Colors.blue + resolvingPackage + Colors.reset)
         if runCommand("xcodebuild", arguments: ["-resolvePackageDependencies"], in: projectDirectory) {
-            print(Colors.white + "🗿 All steps completed successfully!" + Colors.reset)
+            print(Colors.white + "All steps completed successfully!" + Colors.reset)
         } else {
-            print(Colors.red + "🚨 Failed to resolve package versions."+ Colors.reset)
+            print(Colors.red + "Failed to resolve package versions." + Colors.reset)
         }
     } else {
-        print(Colors.red + "🚨 Failed to install pods." + Colors.reset)
+        print(Colors.red + "Failed to install pods." + Colors.reset)
     }
   } else {
-      print(Colors.red + "🚨 Failed to deintegrate pods." + Colors.reset)
+      print(Colors.red + "Failed to deintegrate pods." + Colors.reset)
   }
 }
 
